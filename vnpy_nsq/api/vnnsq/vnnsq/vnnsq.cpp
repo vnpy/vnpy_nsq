@@ -866,6 +866,10 @@ void MdApi::processRtnFutuDepthMarketData(Task *task)
 			bid.append(task_data->BidPrice[i]);
 			bid_qty.append(task_data->BidVolume[i]);
 		}
+		data["ask"] = ask;
+		data["bid"] = bid;
+		data["bid_qty"] = bid_qty;
+		data["ask_qty"] = ask_qty;
 
 		data["AveragePrice"] = task_data->AveragePrice;
 		data["PreOpenInterest"] = task_data->PreOpenInterest;
@@ -942,6 +946,10 @@ void MdApi::processRspQryFutuDepthMarketData(Task *task)
 			bid.append(task_data->BidPrice[i]);
 			bid_qty.append(task_data->BidVolume[i]);
 		}
+		data["ask"] = ask;
+		data["bid"] = bid;
+		data["bid_qty"] = bid_qty;
+		data["ask_qty"] = ask_qty;
 
 		data["AveragePrice"] = task_data->AveragePrice;
 		data["PreOpenInterest"] = task_data->PreOpenInterest;
@@ -1021,6 +1029,10 @@ void MdApi::processRtnSecuDepthMarketData(Task *task)
 			bid.append(task_data->BidPrice[i]);
 			bid_qty.append(task_data->BidVolume[i]);
 		}
+		data["ask"] = ask;
+		data["bid"] = bid;
+		data["bid_qty"] = bid_qty;
+		data["ask_qty"] = ask_qty;
 
 		data["TradesNum"] = task_data->TradesNum;
 		data["InstrumentTradeStatus"] = task_data->InstrumentTradeStatus;
@@ -1326,6 +1338,10 @@ void MdApi::processRspQrySecuDepthMarketData(Task *task)
 			bid.append(task_data->BidPrice[i]);
 			bid_qty.append(task_data->BidVolume[i]);
 		}
+		data["ask"] = ask;
+		data["bid"] = bid;
+		data["bid_qty"] = bid_qty;
+		data["ask_qty"] = ask_qty;
 
 		data["TradesNum"] = task_data->TradesNum;
 		data["InstrumentTradeStatus"] = task_data->InstrumentTradeStatus;
@@ -1446,6 +1462,10 @@ void MdApi::processRtnOptDepthMarketData(Task *task)
 			bid.append(task_data->BidPrice[i]);
 			bid_qty.append(task_data->BidVolume[i]);
 		}
+		data["ask"] = ask;
+		data["bid"] = bid;
+		data["bid_qty"] = bid_qty;
+		data["ask_qty"] = ask_qty;
 
 		data["TradesNum"] = task_data->TradesNum;
 		data["InstrumentTradeStatus"] = task_data->InstrumentTradeStatus;
@@ -1552,6 +1572,10 @@ void MdApi::processRspQryOptDepthMarketData(Task *task)
 			bid.append(task_data->BidPrice[i]);
 			bid_qty.append(task_data->BidVolume[i]);
 		}
+		data["ask"] = ask;
+		data["bid"] = bid;
+		data["bid_qty"] = bid_qty;
+		data["ask_qty"] = ask_qty;
 
 		data["TradesNum"] = task_data->TradesNum;
 		data["InstrumentTradeStatus"] = task_data->InstrumentTradeStatus;
@@ -1636,6 +1660,10 @@ void MdApi::processRtnSecuDepthMarketDataPlus(Task *task)
 			bid.append(task_data->BidPrice[i]);
 			bid_qty.append(task_data->BidVolume[i]);
 		}
+		data["ask"] = ask;
+		data["bid"] = bid;
+		data["bid_qty"] = bid_qty;
+		data["ask_qty"] = ask_qty;
 
 		delete task_data;
 	}
@@ -1742,6 +1770,10 @@ void MdApi::processRtnHktDepthMarketData(Task *task)
 			bid.append(task_data->BidPrice[i]);
 			bid_qty.append(task_data->BidVolume[i]);
 		}
+		data["ask"] = ask;
+		data["bid"] = bid;
+		data["bid_qty"] = bid_qty;
+		data["ask_qty"] = ask_qty;
 
 		data["InstrumentTradeStatus"] = task_data->InstrumentTradeStatus;
 		data["BoardLotOrderBidLimit"] = task_data->BoardLotOrderBidLimit;
@@ -1775,12 +1807,12 @@ void MdApi::release()
 	this->api->ReleaseApi();
 };
 
-int MdApi::init(string licFile, string safeLevel, string pwd, string sslFile, string sslPwd)
+int MdApi::init(string licFile)
 {
 	this->active = true;
 	this->task_thread = thread(&MdApi::processTask, this);
 
-	int i = this->api->Init(licFile.c_str(), safeLevel.c_str(), pwd.c_str(), sslFile.c_str(), sslPwd.c_str());
+	int i = this->api->Init(licFile.c_str());
 	return i;
 
 };
@@ -1805,7 +1837,7 @@ int MdApi::exit()
 string MdApi::getApiErrorMsg(int errorCode)
 {
 	string i = this->api->GetApiErrorMsg(errorCode);
-	return i;
+	return toUtf(i);
 
 };
 
