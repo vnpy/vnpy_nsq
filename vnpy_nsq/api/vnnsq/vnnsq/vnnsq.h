@@ -516,7 +516,7 @@ public:
 
 	void release();
 
-	int init(string licFile, string safeLevel, string pwd, string sslFile, string sslPwd);
+	int init(string licFile);
 
 	int join();
 

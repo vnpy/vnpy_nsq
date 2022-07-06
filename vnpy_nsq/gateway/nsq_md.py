@@ -15,7 +15,8 @@ from vnpy.trader.utility import get_folder_path, ZoneInfo
 from ..api import (
     MdApi,
     HS_EI_SSE,
-    HS_EI_SZSE
+    HS_EI_SZSE,
+    HS_SET_Stock
 )
 
 
@@ -28,7 +29,7 @@ EXCHANGE_VT2NSQ: Dict[Exchange, str] = {v: k for k, v in EXCHANGE_NSQ2VT.items()
 
 # 其他常量
 MAX_FLOAT = sys.float_info.max                  # 浮点数极限值
-CHINA_TZ = ZoneInfo("Asia/Shanghai")       # 中国时区
+CHINA_TZ = ZoneInfo("Asia/Shanghai")            # 中国时区
 
 
 class NsqMdApi(MdApi):
@@ -69,28 +70,38 @@ class NsqMdApi(MdApi):
             self.gateway.write_log("行情服务器登录成功")
             self.query_contract()
 
+            for symbolstr in self.subscribed:
+                self.reqid += 1
+                symbol, exchange = symbolstr.split("_")
+                nsq_req: dict = {
+                    "ExchangeID": exchange,
+                    "InstrumentID": symbol
+                }
+                self.reqSecuDepthMarketDataSubscribe(nsq_req, 1, self.reqid)
+
         else:
             self.gateway.write_error("行情服务器登录失败", error)
 
     def onRspQrySecuInstruments(self, data: dict, error: dict, reqid: int, last: bool) -> None:
         """合约信息查询回报"""
-        if not error["ErrorID"]:
+        if error["ErrorID"]:
             return
 
-        contract: ContractData = ContractData(
-            symbol=data["InstrumentID"],
-            exchange=EXCHANGE_NSQ2VT[data["ExchangeID"]],
-            name=data["InstrumentName"],
-            product=Product.EQUITY,
-            size=1,
-            pricetick=data["PriceTick"],
-            gateway_name=self.gateway_name
-        )
-        self.gateway.on_contract(contract)
-        self.symbol_contract_map[contract.symbol] = contract
+        if data["SecurityType"] == HS_SET_Stock:
+            contract: ContractData = ContractData(
+                symbol=data["InstrumentID"],
+                exchange=EXCHANGE_NSQ2VT[data["ExchangeID"]],
+                name=data["InstrumentName"],
+                product=Product.EQUITY,
+                size=1,
+                pricetick=data["PriceTick"],
+                gateway_name=self.gateway_name
+            )
+            self.gateway.on_contract(contract)
+            self.symbol_contract_map[contract.symbol] = contract
 
         if last:
-            self.gateway.write_log(f"{contract.exchange.value}合约信息查询成功")
+            self.gateway.write_log(f"{EXCHANGE_NSQ2VT[data['ExchangeID']].value}合约信息查询成功")
 
     def onRspSecuDepthMarketDataSubscribe(self, error: dict, reqid: int, last: bool) -> None:
         """订阅行情回报"""
@@ -112,7 +123,7 @@ class NsqMdApi(MdApi):
             return
 
         timestamp: str = f"{data['TradeDate']} {data['UpdateTime']}"
-        dt: datetime = datetime.strptime(timestamp, "%Y%m%d %H:%M:%S%f")
+        dt: datetime = datetime.strptime(timestamp, "%Y%m%d %H%M%S%f")
         dt: datetime = dt.replace(tzinfo=CHINA_TZ)
 
         tick: TickData = TickData(
@@ -122,20 +133,20 @@ class NsqMdApi(MdApi):
             name=contract.name,
             volume=data["TradeVolume"],
             turnover=data["TradeBalance"],
-            last_price=adjust_price(data["LastPrice"]),
-            limit_up=data["UpperLimitPrice"],
-            limit_down=data["LowerLimitPrice"],
-            open_price=adjust_price(data["OpenPrice"]),
-            high_price=adjust_price(data["HighPrice"]),
-            low_price=adjust_price(data["LowPrice"]),
-            pre_close=adjust_price(data["ClosePrice"]),
+            last_price=round(data["LastPrice"], 2),
+            limit_up=round(data["UpperLimitPrice"], 2),
+            limit_down=round(data["LowerLimitPrice"], 2),
+            open_price=round(data["OpenPrice"], 2),
+            high_price=round(data["HighPrice"], 2),
+            low_price=round(data["LowPrice"], 2),
+            pre_close=round(data["ClosePrice"], 2),
             gateway_name=self.gateway_name
         )
 
-        tick.bid_price_1, tick.bid_price_2, tick.bid_price_3, tick.bid_price_4, tick.bid_price_5 = data["bid"][0:5]
-        tick.ask_price_1, tick.ask_price_2, tick.ask_price_3, tick.ask_price_4, tick.ask_price_5 = data["ask"][0:5]
-        tick.bid_volume_1, tick.bid_volume_2, tick.bid_volume_3, tick.bid_volume_4, tick.bid_volume_5 = data["bid_qty"][0:5]
-        tick.ask_volume_1, tick.ask_volume_2, tick.ask_volume_3, tick.ask_volume_4, tick.ask_volume_5 = data["ask_qty"][0:5]
+        tick.bid_price_1, tick.bid_price_2, tick.bid_price_3, tick.bid_price_4, tick.bid_price_5 = list(map(lambda x: round(x, 2), data["bid"][0:5]))
+        tick.ask_price_1, tick.ask_price_2, tick.ask_price_3, tick.ask_price_4, tick.ask_price_5 = list(map(lambda x: round(x, 2), data["ask"][0:5]))
+        tick.bid_volume_1, tick.bid_volume_2, tick.bid_volume_3, tick.bid_volume_4, tick.bid_volume_5 = list(map(lambda x: round(x, 2), data["bid_qty"][0:5]))
+        tick.ask_volume_1, tick.ask_volume_2, tick.ask_volume_3, tick.ask_volume_4, tick.ask_volume_5 = list(map(lambda x: round(x, 2), data["ask_qty"][0:5]))
 
         self.gateway.on_tick(tick)
 
@@ -149,7 +160,7 @@ class NsqMdApi(MdApi):
             path: Path = get_folder_path(self.gateway_name.lower())
             self.newNsqApi((str(path) + "\\Md").encode("GBK"))
 
-            self.init("", "", "", "", "")
+            self.init("")
 
             self.inited = True
 
@@ -167,14 +178,14 @@ class NsqMdApi(MdApi):
         """订阅行情"""
         contract: ContractData = self.symbol_contract_map.get(req.symbol, None)
 
-        if contract:
+        if contract and self.login_status:
             self.reqid += 1
             nsq_req: dict = {
                 "ExchangeID":EXCHANGE_VT2NSQ[req.exchange],
                 "InstrumentID": req.symbol
             }
             self.reqSecuDepthMarketDataSubscribe(nsq_req, 1, self.reqid)
-            self.subscribed.add(req.symbol)
+            self.subscribed.add(req.symbol + "_" + EXCHANGE_VT2NSQ[req.exchange])
 
     def query_contract(self) -> None:
         """查询合约"""
@@ -187,10 +198,3 @@ class NsqMdApi(MdApi):
         """关闭连接"""
         if self.inited:
             self.exit()
-
-
-def adjust_price(price: float) -> float:
-    """将异常的浮点数最大值（MAX_FLOAT）数据调整为0"""
-    if price == MAX_FLOAT:
-        price = 0
-    return price
